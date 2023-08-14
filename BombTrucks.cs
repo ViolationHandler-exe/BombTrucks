@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Oxide.Core;
 using Oxide.Core.Libraries.Covalence;
@@ -12,14 +12,14 @@ using Oxide.Core.Plugins;
 
 namespace Oxide.Plugins
 {
-    [Info("Bomb Trucks", "WhiteThunder", "0.8.6")]
+    [Info("Bomb Trucks", "WhiteThunder", "0.8.7")]
     [Description("Allow players to spawn bomb trucks.")]
     internal class BombTrucks : CovalencePlugin
     {
         #region Fields
 
         [PluginReference]
-        private readonly Plugin NoEngineParts, NoEscape, SpawnModularCar;
+        private readonly Plugin NoEngineParts, NoEscape, SpawnModularCar, ZoneManager;
 
         private const int RfReservedRangeMin = 4760;
         private const int RfReservedRangeMax = 4790;
@@ -338,6 +338,7 @@ namespace Oxide.Plugins
                 !VerifyOnGround(player, basePlayer) ||
                 !VerifyNotParented(player, basePlayer) ||
                 !VerifyNotRaidOrCombatBlocked(basePlayer) ||
+                !VerifyNotInZone(basePlayer) ||
                 SpawnWasBlocked(basePlayer))
                 return;
 
@@ -402,6 +403,21 @@ namespace Oxide.Plugins
 
             return true;
         }
+
+        private bool VerifyNotInZone(BasePlayer player)
+        {
+            if (!_pluginConfig.ZoneManagerSettings.CanSpawnInZones && InZone(player))
+            {
+                ChatMessage(player, "Command.Spawn.Error.InZone");
+                return false;
+            }
+
+            return true;
+        }
+        
+        private bool InZone(BasePlayer player) => 
+            ZoneManager != null && ZoneManager.IsLoaded && (bool)ZoneManager?.Call("PlayerHasFlag", player, "keepvehiclesout");
+        
 
         private bool IsRaidBlocked(BasePlayer player) =>
             NoEscape != null && (bool)NoEscape.Call("IsRaidBlocked", player);
@@ -1170,6 +1186,9 @@ namespace Oxide.Plugins
 
             [JsonProperty("NoEscapeSettings")]
             public NoEscapeSettings NoEscapeSettings = new NoEscapeSettings();
+            
+            [JsonProperty("ZoneManagerSettings")]
+            public ZoneManagerSettings ZoneManagerSettings = new ZoneManagerSettings();
         }
 
         private class TruckConfig
@@ -1298,6 +1317,12 @@ namespace Oxide.Plugins
 
             [JsonProperty("CanSpawnWhileCombatBlocked")]
             public bool CanSpawnWhileCombatBlocked = true;
+        }
+
+        private class ZoneManagerSettings
+        {
+            [JsonProperty("CanSpawnInZones")]
+            public bool CanSpawnInZones = false;
         }
 
         #endregion
@@ -1443,6 +1468,7 @@ namespace Oxide.Plugins
                 ["Command.Help.RemainingCooldown"] = "<color=red>{0}</color>",
                 ["Command.Spawn.Error.RaidBlocked"] = "Error: Cannot do that while raid blocked.",
                 ["Command.Spawn.Error.CombatBlocked"] = "Error: Cannot do that while combat blocked.",
+                ["Command.Spawn.Error.InZone"] = "Error: Cannot do that while in the zone.",
                 ["Command.Give.Error.Syntax"] = "Syntax: <color=yellow>givebombtruck <player> <truck name></color>",
                 ["Command.Give.Error.PlayerNotFound"] = "Error: Player <color=red>{0}</color> not found.",
                 ["Lift.Edit.Error"] = "Error: That vehicle may not be edited.",
